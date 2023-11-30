@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:weather_station_companion/shared/data_sink_format.dart';
 import 'package:weather_station_companion/feature/detail/bloc/bloc.dart';
@@ -111,7 +112,7 @@ class _DetailPageState extends State<DetailPage> {
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: TextField(
               controller: _textEditingControllerMAC,
-              enabled: state.isConnected,
+              enabled: false,
               readOnly: true,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
@@ -123,11 +124,13 @@ class _DetailPageState extends State<DetailPage> {
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: TextField(
               controller: _textEditingControllerDataSink,
-              enabled: state.isConnected,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 label: Text('Data sink'),
               ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9$?!/.,&\\%+=()]'))
+              ],
             ),
           ),
           Padding(
@@ -153,11 +156,9 @@ class _DetailPageState extends State<DetailPage> {
                   child: Text('MQTT'),
                 ),
               ],
-              onChanged: state.isConnected
-                  ? (int? value) => setState(() {
-                        selectedDataSinkFormat = value ?? 0;
-                      })
-                  : null,
+              onChanged: (int? value) => setState(() {
+                selectedDataSinkFormat = value ?? DataSinkFormat.json;
+              }),
             ),
           ),
           Padding(
@@ -165,7 +166,6 @@ class _DetailPageState extends State<DetailPage> {
             child: TextField(
               controller: _textEditingControllerMeasurementRate,
               keyboardType: TextInputType.number,
-              enabled: state.isConnected,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 label: Text('Measurement rate (seconds)'),
@@ -177,7 +177,6 @@ class _DetailPageState extends State<DetailPage> {
             child: TextField(
               controller: _textEditingControllerUploadRate,
               keyboardType: TextInputType.number,
-              enabled: state.isConnected,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 label: Text('Upload rate (seconds)'),
@@ -188,11 +187,13 @@ class _DetailPageState extends State<DetailPage> {
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: TextField(
               controller: _textEditingControllerWiFiSSID,
-              enabled: state.isConnected,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 label: Text('WiFi SSID'),
               ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9$?!/.,&\\%+=()]'))
+              ],
             ),
           ),
           Padding(
@@ -200,7 +201,6 @@ class _DetailPageState extends State<DetailPage> {
             child: TextField(
               controller: _textEditingControllerWiFiPassword,
               obscureText: !_showPassword,
-              enabled: state.isConnected,
               decoration: InputDecoration(
                 border: const OutlineInputBorder(),
                 label: const Text('WiFi Password'),
@@ -211,6 +211,9 @@ class _DetailPageState extends State<DetailPage> {
                   ),
                 ),
               ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9$?!/.,&\\%+=()]'))
+              ],
             ),
           ),
         ],

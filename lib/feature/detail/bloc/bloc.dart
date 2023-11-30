@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:bloc/bloc.dart';
@@ -14,13 +15,20 @@ import '../../../shared/snack_bar_message.dart';
 import '../../discover/data/saved_connection_repository.dart';
 
 part 'event.dart';
-
 part 'state.dart';
 
 class DetailBloc extends Bloc<DetailEvent, DetailState> {
   final String mac;
   final bool shouldConnect;
   BluetoothDevice? targetDevice;
+
+  static const configurationServiceUUID = '00ff';
+  static const characteristicDataSink = 'ff01';
+  static const characteristicDataSinkPushFormat = 'ff02';
+  static const characteristicMeasurementRate = 'ff03';
+  static const characteristicUploadRate = 'ff04';
+  static const characteristicWifiSSID = 'ff05';
+  static const characteristicWifiPassword = 'ff06';
 
   DetailBloc(this.mac, this.shouldConnect) : super(const DetailState()) {
     on<DetailInitialized>(_onDetailInitialized);
@@ -59,7 +67,7 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
     ));
 
     // If a connection already exists we disconnect first
-    await this.targetDevice?.disconnect(timeout: 2);
+    await targetDevice?.disconnect(timeout: 2);
 
     // Register a handler for the incoming ScanResults. If we find our target
     // device, we will complete a completer.
@@ -104,8 +112,7 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
     await foundDevice.device.connect(
       timeout: const Duration(seconds: 10),
       autoConnect: false,
-    )
-        .catchError((e) {
+    ).catchError((e) {
       emit(state.copyWith(
         snackBarMessage: SnackBarMessage('Connect error: $e'),
       ));
@@ -117,17 +124,69 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
     await SavedConnectionRepository.persist(
       SavedConnection(foundDevice.device.remoteId.str, foundDevice.device.advName, DateTime.now()),
     );
+    
+    await Future.delayed(const Duration(milliseconds: 500));
 
-    // TODO fetch configuration
+    if (targetDevice != null && !targetDevice!.isConnected) {
+      return emit(state.copyWith(
+        snackBarMessage: SnackBarMessage('Failed to connect. Please retry!'),
+        isConnected: false,
+      ));
+    }
+
+    if (targetDevice != null) {
+      await targetDevice!.discoverServices();
+
+      final configurationService = targetDevice!.servicesList.firstWhere((e) => e.serviceUuid.uuid == configurationServiceUUID);
+
+      for (final characteristic in configurationService.characteristics) {
+        switch (characteristic.characteristicUuid.uuid) {
+          case characteristicDataSink:
+            emit(state.copyWith(
+              dataSink: utf8.decode((await characteristic.read())),
+            ));
+            break;
+          case characteristicDataSinkPushFormat:
+            final bytes = await characteristic.read();
+            emit(state.copyWith(
+              dataSinkFormat: bytes[0] ,
+            ));
+            break;
+          case characteristicMeasurementRate:
+            final bytes = await characteristic.read();
+            emit(state.copyWith(
+              measurementRate: (bytes[0] << 8) + bytes[1] ,
+            ));
+            break;
+          case characteristicUploadRate:
+            final bytes = await characteristic.read();
+            emit(state.copyWith(
+              uploadRate: (bytes[0] << 8) + bytes[1] ,
+            ));
+            break;
+          case characteristicWifiSSID:
+            emit(state.copyWith(
+              wifiSSID: utf8.decode((await characteristic.read())),
+            ));
+            break;
+          case characteristicWifiPassword:
+            emit(state.copyWith(
+              wifiPassword: utf8.decode((await characteristic.read())),
+            ));
+            break;
+            // TODO: persist characteristic
+        }
+      }
+    }
 
     final loadedConfiguration = SavedConfiguration(
-      targetDevice!.remoteId.str,
-      'http://mbuelow.dev/dump/index.php',
-      DataSinkFormat.json,
-      60,
-      600,
-      '0x20',
-      'password123',
+      state.mac,
+      state.dataSink,
+      state.dataSinkFormat,
+      state.measurementRate,
+      state.uploadRate,
+      state.wifiSSID,
+      state.wifiPassword,
     );
 
     await SavedConfigurationRepository.persist(loadedConfiguration);
@@ -135,12 +194,6 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
     emit(state.copyWith(
       snackBarMessage: SnackBarMessage('Connected!'),
       isConnected: true,
-      dataSink: loadedConfiguration.dataSink,
-      dataSinkFormat: loadedConfiguration.dataSinkFormat,
-      measurementRate: loadedConfiguration.measurementRate,
-      uploadRate: loadedConfiguration.uploadRate,
-      wifiSSID: loadedConfiguration.wifiSSID,
-      wifiPassword: loadedConfiguration.wifiPassword,
     ));
   }
 
@@ -161,28 +214,47 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
       snackBarMessage: SnackBarMessage('Upload new configuration...'),
     ));
 
-    // TODO sync new configuration to device
-
-    await Future.delayed(const Duration(seconds: 1));
-
-    emit(state.copyWith(
-        snackBarMessage: SnackBarMessage('Successfully uploaded!'),
-    ));
-
-    // TODO if successful persist config
-    await SavedConfigurationRepository.persist(newConfiguration);
-
-    print('targetDevice is not null: ${targetDevice != null}');
     if (targetDevice != null) {
       await targetDevice!.discoverServices();
 
-      for (final service in targetDevice!.servicesList) {
-        print('Service: ${service.serviceUuid}');
-        for (final characteristic in service.characteristics) {
-          print('Characteristic: ${characteristic.characteristicUuid}');
+      final configurationService = targetDevice!.servicesList.firstWhere((e) => e.serviceUuid.uuid == configurationServiceUUID);
+
+      for (final characteristic in configurationService.characteristics) {
+        switch (characteristic.characteristicUuid.uuid) {
+          case characteristicDataSink:
+            await characteristic.write(utf8.encode(event.dataSink));
+            break;
+          case characteristicDataSinkPushFormat:
+            await characteristic.write([event.dataSinkFormat]);
+            break;
+          case characteristicMeasurementRate:
+            await characteristic.write([(event.measurementRate >> 8) & 0xFF, (event.measurementRate & 0x00FF) & 0xFF]);
+            break;
+          case characteristicUploadRate:
+            await characteristic.write([(event.uploadRate >> 8) & 0xFF, (event.uploadRate & 0x00FF) & 0xFF]);
+            break;
+          case characteristicWifiSSID:
+            await characteristic.write(utf8.encode(event.wifiSSID));
+            break;
+          case characteristicWifiPassword:
+            await characteristic.write(utf8.encode(event.wifiPassword));
+            break;
         }
       }
     }
+
+    // TODO only if successful persist config
+    await SavedConfigurationRepository.persist(newConfiguration);
+
+    emit(state.copyWith(
+      snackBarMessage: SnackBarMessage('Successfully uploaded!'),
+      dataSink: event.dataSink,
+      dataSinkFormat: event.dataSinkFormat,
+      measurementRate: event.measurementRate,
+      uploadRate: event.uploadRate,
+      wifiSSID: event.wifiSSID,
+      wifiPassword: event.wifiPassword,
+    ));
   }
 
   Future<void> _onDetailNavigateBackTriggered(DetailNavigateBackTriggered event, Emitter<DetailState> emit) async {
