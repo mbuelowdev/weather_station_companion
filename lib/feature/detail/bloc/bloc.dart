@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_init_to_null
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -29,6 +31,7 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
   static const characteristicUploadRate = 'ff04';
   static const characteristicWifiSSID = 'ff05';
   static const characteristicWifiPassword = 'ff06';
+  static const characteristicFlushTrigger = 'ffff';
 
   DetailBloc(this.mac, this.shouldConnect) : super(const DetailState()) {
     on<DetailInitialized>(_onDetailInitialized);
@@ -124,9 +127,11 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
     await SavedConnectionRepository.persist(
       SavedConnection(foundDevice.device.remoteId.str, foundDevice.device.advName, DateTime.now()),
     );
-    
+
     await Future.delayed(const Duration(milliseconds: 500));
 
+    // Sometimes the connection just fails under android. We ask the user to
+    // connect again.
     if (targetDevice != null && !targetDevice!.isConnected) {
       return emit(state.copyWith(
         snackBarMessage: SnackBarMessage('Failed to connect. Please retry!'),
@@ -134,73 +139,35 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
       ));
     }
 
-    if (targetDevice != null) {
-      await targetDevice!.discoverServices();
+    // We fetch the current configuration of the device
+    final loadedConfiguration = await _readConfiguration(state.mac);
 
-      final configurationService = targetDevice!.servicesList.firstWhere((e) => e.serviceUuid.uuid == configurationServiceUUID);
-
-      for (final characteristic in configurationService.characteristics) {
-        switch (characteristic.characteristicUuid.uuid) {
-          case characteristicDataSink:
-            emit(state.copyWith(
-              dataSink: utf8.decode((await characteristic.read())),
-            ));
-            break;
-          case characteristicDataSinkPushFormat:
-            final bytes = await characteristic.read();
-            emit(state.copyWith(
-              dataSinkFormat: bytes[0] ,
-            ));
-            break;
-          case characteristicMeasurementRate:
-            final bytes = await characteristic.read();
-            emit(state.copyWith(
-              measurementRate: (bytes[0] << 8) + bytes[1] ,
-            ));
-            break;
-          case characteristicUploadRate:
-            final bytes = await characteristic.read();
-            emit(state.copyWith(
-              uploadRate: (bytes[0] << 8) + bytes[1] ,
-            ));
-            break;
-          case characteristicWifiSSID:
-            emit(state.copyWith(
-              wifiSSID: utf8.decode((await characteristic.read())),
-            ));
-            break;
-          case characteristicWifiPassword:
-            emit(state.copyWith(
-              wifiPassword: utf8.decode((await characteristic.read())),
-            ));
-            break;
-            // TODO: persist characteristic
-        }
-      }
+    // If that fails loadedConfiguration will be null
+    if (loadedConfiguration == null) {
+      return emit(state.copyWith(
+        snackBarMessage: SnackBarMessage('Failed to connect!'),
+        isConnected: false,
+      ));
     }
 
-    final loadedConfiguration = SavedConfiguration(
-      state.mac,
-      state.dataSink,
-      state.dataSinkFormat,
-      state.measurementRate,
-      state.uploadRate,
-      state.wifiSSID,
-      state.wifiPassword,
-    );
-
+    // We successfully fetched the configuration, we'll now persist it
     await SavedConfigurationRepository.persist(loadedConfiguration);
 
+    // Show a success message
     emit(state.copyWith(
       snackBarMessage: SnackBarMessage('Connected!'),
       isConnected: true,
+      dataSink: loadedConfiguration.dataSink,
+      dataSinkFormat: loadedConfiguration.dataSinkFormat,
+      measurementRate: loadedConfiguration.measurementRate,
+      uploadRate: loadedConfiguration.uploadRate,
+      wifiSSID: loadedConfiguration.wifiSSID,
+      wifiPassword: loadedConfiguration.wifiPassword,
     ));
   }
 
   Future<void> _onDetailSaveButtonPressed(DetailSaveButtonPressed event, Emitter<DetailState> emit) async {
-    emit(state.copyWith());
-
-    final newConfiguration = SavedConfiguration(
+    final possiblyNewConfiguration = SavedConfiguration(
       event.mac,
       event.dataSink,
       event.dataSinkFormat,
@@ -211,50 +178,35 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
     );
 
     emit(state.copyWith(
-      snackBarMessage: SnackBarMessage('Upload new configuration...'),
+      snackBarMessage: SnackBarMessage('Uploading new configuration...'),
     ));
 
-    if (targetDevice != null) {
-      await targetDevice!.discoverServices();
+    final wasSuccessful = await _writeConfiguration(
+      possiblyNewConfiguration.dataSink,
+      possiblyNewConfiguration.dataSinkFormat,
+      possiblyNewConfiguration.measurementRate,
+      possiblyNewConfiguration.uploadRate,
+      possiblyNewConfiguration.wifiSSID,
+      possiblyNewConfiguration.wifiPassword,
+    );
 
-      final configurationService = targetDevice!.servicesList.firstWhere((e) => e.serviceUuid.uuid == configurationServiceUUID);
-
-      for (final characteristic in configurationService.characteristics) {
-        switch (characteristic.characteristicUuid.uuid) {
-          case characteristicDataSink:
-            await characteristic.write(utf8.encode(event.dataSink));
-            break;
-          case characteristicDataSinkPushFormat:
-            await characteristic.write([event.dataSinkFormat]);
-            break;
-          case characteristicMeasurementRate:
-            await characteristic.write([(event.measurementRate >> 8) & 0xFF, (event.measurementRate & 0x00FF) & 0xFF]);
-            break;
-          case characteristicUploadRate:
-            await characteristic.write([(event.uploadRate >> 8) & 0xFF, (event.uploadRate & 0x00FF) & 0xFF]);
-            break;
-          case characteristicWifiSSID:
-            await characteristic.write(utf8.encode(event.wifiSSID));
-            break;
-          case characteristicWifiPassword:
-            await characteristic.write(utf8.encode(event.wifiPassword));
-            break;
-        }
-      }
+    // Only save the configuration if the write operation was successful
+    if (wasSuccessful) {
+      await SavedConfigurationRepository.persist(possiblyNewConfiguration);
+      emit(state.copyWith(
+        snackBarMessage: SnackBarMessage('Successfully uploaded!'),
+        dataSink: possiblyNewConfiguration.dataSink,
+        dataSinkFormat: possiblyNewConfiguration.dataSinkFormat,
+        measurementRate: possiblyNewConfiguration.measurementRate,
+        uploadRate: possiblyNewConfiguration.uploadRate,
+        wifiSSID: possiblyNewConfiguration.wifiSSID,
+        wifiPassword: possiblyNewConfiguration.wifiPassword,
+      ));
+    } else {
+      emit(state.copyWith(
+        snackBarMessage: SnackBarMessage('Upload failed!'),
+      ));
     }
-
-    // TODO only if successful persist config
-    await SavedConfigurationRepository.persist(newConfiguration);
-
-    emit(state.copyWith(
-      snackBarMessage: SnackBarMessage('Successfully uploaded!'),
-      dataSink: event.dataSink,
-      dataSinkFormat: event.dataSinkFormat,
-      measurementRate: event.measurementRate,
-      uploadRate: event.uploadRate,
-      wifiSSID: event.wifiSSID,
-      wifiPassword: event.wifiPassword,
-    ));
   }
 
   Future<void> _onDetailNavigateBackTriggered(DetailNavigateBackTriggered event, Emitter<DetailState> emit) async {
@@ -273,5 +225,112 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
       isConnected: false,
       disconnectedToLeave: true,
     ));
+  }
+
+  Future<SavedConfiguration?> _readConfiguration(String mac) async {
+    // If we fail to connect to the device then targetDevice will be null
+    if (targetDevice == null) {
+      return null;
+    }
+
+    try {
+      String? dataSink = null;
+      int? dataSinkPushFormat = null;
+      int? measurementRate = null;
+      int? uploadRate = null;
+      String? wifiSSID = null;
+      String? wifiPassword = null;
+
+      // Start looking for services advertised by the device
+      await targetDevice!.discoverServices();
+
+      // Fetch the "Configuration"-Service
+      final configurationService = targetDevice!.servicesList.firstWhere((e) => e.serviceUuid.uuid == configurationServiceUUID);
+
+      for (final characteristic in configurationService.characteristics) {
+        switch (characteristic.characteristicUuid.uuid) {
+          case characteristicDataSink:
+            dataSink = utf8.decode((await characteristic.read()));
+            break;
+          case characteristicDataSinkPushFormat:
+            final bytes = await characteristic.read();
+            dataSinkPushFormat = bytes[0];
+            break;
+          case characteristicMeasurementRate:
+            final bytes = await characteristic.read();
+            measurementRate = (bytes[0] << 8) + bytes[1];
+            break;
+          case characteristicUploadRate:
+            final bytes = await characteristic.read();
+            uploadRate = (bytes[0] << 8) + bytes[1];
+            break;
+          case characteristicWifiSSID:
+            wifiSSID = utf8.decode((await characteristic.read()));
+            break;
+          case characteristicWifiPassword:
+            wifiPassword = utf8.decode((await characteristic.read()));
+            break;
+        }
+      }
+
+      return SavedConfiguration(
+        mac,
+        dataSink!,
+        dataSinkPushFormat!,
+        measurementRate!,
+        uploadRate!,
+        wifiSSID!,
+        wifiPassword!,
+      );
+    } catch (_) {}
+
+    return null;
+  }
+
+  Future<bool> _writeConfiguration(String dataSink, int dataSinkFormat, int measurementRate, int uploadRate, String wifiSSID, String wifiPassword) async {
+    // If we fail to connect to the device then targetDevice will be null
+    if (targetDevice == null) {
+      return false;
+    }
+
+    try {
+      // Start looking for services advertised by the device
+      await targetDevice!.discoverServices();
+
+      // Fetch the "Configuration"-Service
+      final configurationService = targetDevice!.servicesList.firstWhere((e) => e.serviceUuid.uuid == configurationServiceUUID);
+
+      for (final characteristic in configurationService.characteristics) {
+        switch (characteristic.characteristicUuid.uuid) {
+          case characteristicDataSink:
+            await characteristic.write(utf8.encode(dataSink));
+            break;
+          case characteristicDataSinkPushFormat:
+            await characteristic.write([dataSinkFormat]);
+            break;
+          case characteristicMeasurementRate:
+            await characteristic.write([(measurementRate >> 8) & 0xFF, (measurementRate & 0x00FF) & 0xFF]);
+            break;
+          case characteristicUploadRate:
+            await characteristic.write([(uploadRate >> 8) & 0xFF, (uploadRate & 0x00FF) & 0xFF]);
+            break;
+          case characteristicWifiSSID:
+            await characteristic.write(utf8.encode(wifiSSID));
+            break;
+          case characteristicWifiPassword:
+            await characteristic.write(utf8.encode(wifiPassword));
+            break;
+        }
+      }
+
+      // Trigger a flush to force the configuration to be saved. Without the
+      // flush the configuration would only exist in the RAM until reboot.
+      final charFlushTrigger = configurationService.characteristics.firstWhere((e) => e.uuid.toString() == characteristicFlushTrigger);
+      await charFlushTrigger.write([0]);
+    } catch (_) {
+      return false;
+    }
+
+    return true;
   }
 }
