@@ -27,22 +27,15 @@ class _DetailPageState extends State<DetailPage> {
   final TextEditingController _textEditingControllerWiFiSSID = TextEditingController();
   final TextEditingController _textEditingControllerWiFiPassword = TextEditingController();
 
-  bool _showPassword = false;
-
-  void _togglePasswordVisibility() {
-    setState(() {
-      _showPassword = !_showPassword;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (BuildContext context) => DetailBloc(widget.mac, widget.connect),
       child: BlocBuilder<DetailBloc, DetailState>(
         builder: (BuildContext context, DetailState state) {
-          return WillPopScope(
-            onWillPop: () => _onLeave(context, state.isConnected),
+          return PopScope(
+            canPop: true,
+            onPopInvoked: (_) => _onLeave(context, state.isConnected),
             child: Scaffold(
               appBar: AppBar(
                 title: const Text('Detail'),
@@ -156,9 +149,16 @@ class _DetailPageState extends State<DetailPage> {
                   child: Text('MQTT'),
                 ),
               ],
-              onChanged: (int? value) => setState(() {
-                selectedDataSinkFormat = value ?? DataSinkFormat.json;
-              }),
+              onChanged: (int? value) => context.read<DetailBloc>().add(DetailOnInputChanged(
+                    _textEditingControllerMAC.text,
+                    _textEditingControllerDataSink.text,
+                    value!,
+                    int.parse(_textEditingControllerMeasurementRate.text),
+                    int.parse(_textEditingControllerUploadRate.text),
+                    _textEditingControllerWiFiSSID.text,
+                    _textEditingControllerWiFiPassword.text,
+                    state.wifiPasswordIsVisible,
+                  )),
             ),
           ),
           Padding(
@@ -200,20 +200,26 @@ class _DetailPageState extends State<DetailPage> {
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: TextField(
               controller: _textEditingControllerWiFiPassword,
-              obscureText: !_showPassword,
+              obscureText: !state.wifiPasswordIsVisible,
               decoration: InputDecoration(
                 border: const OutlineInputBorder(),
                 label: const Text('WiFi Password'),
                 suffixIcon: GestureDetector(
-                  onTap: () => _togglePasswordVisibility(),
+                  onTap: () => context.read<DetailBloc>().add(DetailOnInputChanged(
+                        _textEditingControllerMAC.text,
+                        _textEditingControllerDataSink.text,
+                        selectedDataSinkFormat,
+                        int.parse(_textEditingControllerMeasurementRate.text),
+                        int.parse(_textEditingControllerUploadRate.text),
+                        _textEditingControllerWiFiSSID.text,
+                        _textEditingControllerWiFiPassword.text,
+                        !state.wifiPasswordIsVisible,
+                      )),
                   child: Icon(
-                    _showPassword ? Icons.visibility : Icons.visibility_off,
+                    state.wifiPasswordIsVisible ? Icons.visibility : Icons.visibility_off,
                   ),
                 ),
               ),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9$?!/.,&\\%+=()]'))
-              ],
             ),
           ),
         ],

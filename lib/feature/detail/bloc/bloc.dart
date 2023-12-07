@@ -38,6 +38,7 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
     on<DetailReconnectTriggered>(_onDetailReconnectTriggered);
     on<DetailSaveButtonPressed>(_onDetailSaveButtonPressed);
     on<DetailNavigateBackTriggered>(_onDetailNavigateBackTriggered);
+    on<DetailOnInputChanged>(_onDetailOnInputChanged);
     _initialize();
   }
 
@@ -227,6 +228,18 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
     ));
   }
 
+  Future<void> _onDetailOnInputChanged(DetailOnInputChanged event, Emitter<DetailState> emit) async {
+    emit(state.copyWith(
+      dataSink: event.dataSink,
+      dataSinkFormat: event.dataSinkFormat,
+      measurementRate: event.measurementRate,
+      uploadRate: event.uploadRate,
+      wifiSSID: event.wifiSSID,
+      wifiPassword: event.wifiPassword,
+      wifiPasswordIsVisible: event.wifiPasswordIsVisible,
+    ));
+  }
+
   Future<SavedConfiguration?> _readConfiguration(String mac) async {
     // If we fail to connect to the device then targetDevice will be null
     if (targetDevice == null) {
@@ -303,7 +316,7 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
       for (final characteristic in configurationService.characteristics) {
         switch (characteristic.characteristicUuid.uuid) {
           case characteristicDataSink:
-            await characteristic.write(utf8.encode(dataSink));
+            await characteristic.write(utf8.encode(dataSink + '\x00'));
             break;
           case characteristicDataSinkPushFormat:
             await characteristic.write([dataSinkFormat]);
@@ -315,10 +328,10 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
             await characteristic.write([(uploadRate >> 8) & 0xFF, (uploadRate & 0x00FF) & 0xFF]);
             break;
           case characteristicWifiSSID:
-            await characteristic.write(utf8.encode(wifiSSID));
+            await characteristic.write(utf8.encode(wifiSSID + '\x00'));
             break;
           case characteristicWifiPassword:
-            await characteristic.write(utf8.encode(wifiPassword));
+            await characteristic.write(utf8.encode(wifiPassword + '\x00'));
             break;
         }
       }

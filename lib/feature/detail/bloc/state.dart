@@ -16,6 +16,7 @@ class DetailState {
   final int uploadRate;
   final String wifiSSID;
   final String wifiPassword;
+  final bool wifiPasswordIsVisible;
   final bool isConnected;
   final bool disconnectedToLeave;
 
@@ -29,6 +30,7 @@ class DetailState {
     this.uploadRate = 0,
     this.wifiSSID = '',
     this.wifiPassword = '',
+    this.wifiPasswordIsVisible = false,
     this.isConnected = false,
     this.disconnectedToLeave = false,
   ]);
@@ -43,6 +45,7 @@ class DetailState {
     int? uploadRate,
     String? wifiSSID,
     String? wifiPassword,
+    bool? wifiPasswordIsVisible,
     bool? isConnected,
     bool? disconnectedToLeave,
   }) {
@@ -56,6 +59,7 @@ class DetailState {
       uploadRate ?? this.uploadRate,
       wifiSSID ?? this.wifiSSID,
       wifiPassword ?? this.wifiPassword,
+      wifiPasswordIsVisible ?? this.wifiPasswordIsVisible,
       isConnected ?? this.isConnected,
       disconnectedToLeave ?? this.disconnectedToLeave,
     );
