@@ -122,7 +122,7 @@ class _DetailPageState extends State<DetailPage> {
                 label: Text('Data sink'),
               ),
               inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9$?!/.,&\\%+=()]'))
+                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9$?!/.,:\-@_&\\%#*"+=()]'))
               ],
             ),
           ),
