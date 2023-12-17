@@ -6,6 +6,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:weather_station_companion/shared/data_sink_format.dart';
 import 'package:weather_station_companion/feature/detail/bloc/bloc.dart';
 
+import 'widgets/info_dialog_description_row.dart';
+import 'widgets/info_dialog_title_row.dart';
+
 class DetailPage extends StatefulWidget {
   static const String routeName = '/detail';
 
@@ -40,6 +43,10 @@ class _DetailPageState extends State<DetailPage> {
               appBar: AppBar(
                 title: const Text('Detail'),
                 actions: [
+                  IconButton(
+                    icon: const Icon(Icons.help),
+                    onPressed: () => _showInfoDialog(context),
+                  ),
                   IconButton(
                     icon: const Icon(Icons.save),
                     onPressed: state.isConnected
@@ -80,7 +87,9 @@ class _DetailPageState extends State<DetailPage> {
     _textEditingControllerWiFiPassword.text = state.wifiPassword;
 
     if (state.isInitializing) {
-      return Container();
+      return const Center(
+        child: CircularProgressIndicator(), // TODO ist evtl nur im debug build so schluchzig
+      );
     }
 
     if (state.snackBarMessage != null && !state.snackBarMessage!.shown) {
@@ -122,8 +131,7 @@ class _DetailPageState extends State<DetailPage> {
                 label: Text('Data sink'),
               ),
               inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9$?!/.,:\-@_&\\%#*"+=()]')),
-                LengthLimitingTextInputFormatter(128+100),
+                LengthLimitingTextInputFormatter(300),
               ],
             ),
           ),
@@ -192,9 +200,6 @@ class _DetailPageState extends State<DetailPage> {
                 border: OutlineInputBorder(),
                 label: Text('WiFi SSID'),
               ),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9$?!/.,&\\%+=()]'))
-              ],
             ),
           ),
           Padding(
@@ -236,5 +241,51 @@ class _DetailPageState extends State<DetailPage> {
     }
 
     return true;
+  }
+
+  Future<void> _showInfoDialog(BuildContext context) async {
+    await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Help'),
+          content: const SingleChildScrollView(
+            child: Column(
+              children: [
+                InfoDialogTitleRow('Data Sink'),
+                InfoDialogDescriptionRow('Maximal length: 300 bytes'),
+                InfoDialogDescriptionRow('Maximal length of HOST part: 128 bytes'),
+                InfoDialogDescriptionRow('Maximal length of PATH part: 128 bytes'),
+                InfoDialogDescriptionRow('Default: http://configure/'),
+                Divider(),
+                InfoDialogTitleRow('Measurement Rate'),
+                InfoDialogDescriptionRow('Amount of time between each measurement cycle'),
+                InfoDialogDescriptionRow('Valid values: 0 - 65535'),
+                InfoDialogDescriptionRow('Default: 60'),
+                Divider(),
+                InfoDialogTitleRow('Upload Rate'),
+                InfoDialogDescriptionRow('Amount of time between each upload cycle'),
+                InfoDialogDescriptionRow('Valid values: 0 - 65535'),
+                InfoDialogDescriptionRow('Default: 600'),
+                Divider(),
+                InfoDialogTitleRow('Wifi SSID'),
+                InfoDialogDescriptionRow('Maximal length: 128 bytes'),
+                InfoDialogDescriptionRow('Default: configure'),
+                Divider(),
+                InfoDialogTitleRow('Wifi Password'),
+                InfoDialogDescriptionRow('Maximal length: 128 bytes'),
+                InfoDialogDescriptionRow('Default: configure'),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Ok'),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
