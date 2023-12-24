@@ -131,7 +131,7 @@ class _DetailPageState extends State<DetailPage> {
                 label: Text('Data sink'),
               ),
               inputFormatters: [
-                LengthLimitingTextInputFormatter(300),
+                ByteSizeLimit(640),
               ],
             ),
           ),
@@ -253,18 +253,20 @@ class _DetailPageState extends State<DetailPage> {
             child: Column(
               children: [
                 InfoDialogTitleRow('Data Sink'),
-                InfoDialogDescriptionRow('Maximal length: 300 bytes'),
+                InfoDialogDescriptionRow('Maximal length: 640 bytes'),
                 InfoDialogDescriptionRow('Maximal length of HOST part: 128 bytes'),
-                InfoDialogDescriptionRow('Maximal length of PATH part: 128 bytes'),
+                InfoDialogDescriptionRow('Maximal length of PATH part: 512 bytes'),
                 InfoDialogDescriptionRow('Default: http://configure/'),
                 Divider(),
-                InfoDialogTitleRow('Measurement Rate'),
+                InfoDialogTitleRow('Measurement Rate (MR)'),
                 InfoDialogDescriptionRow('Amount of time between each measurement cycle'),
                 InfoDialogDescriptionRow('Valid values: 0 - 65535'),
                 InfoDialogDescriptionRow('Default: 60'),
                 Divider(),
-                InfoDialogTitleRow('Upload Rate'),
+                InfoDialogTitleRow('Upload Rate (UR)'),
                 InfoDialogDescriptionRow('Amount of time between each upload cycle'),
+                InfoDialogDescriptionRow('Uploads only happen after a measurement. This means the actual upload time may vary by one measurement cycle.'
+                    'For example: MR of 45s and UR of 60s -> the first uploads will happen after 90s, 135s and 180s instead of 60s, 120s and 180s.'),
                 InfoDialogDescriptionRow('Valid values: 0 - 65535'),
                 InfoDialogDescriptionRow('Default: 600'),
                 Divider(),
@@ -287,5 +289,16 @@ class _DetailPageState extends State<DetailPage> {
         );
       },
     );
+  }
+}
+
+class ByteSizeLimit extends TextInputFormatter {
+  final int sizeLimit;
+
+  ByteSizeLimit(this.sizeLimit);
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    return newValue.text.length > sizeLimit ? oldValue : newValue;
   }
 }
