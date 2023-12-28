@@ -153,10 +153,6 @@ class _DetailPageState extends State<DetailPage> {
                   value: DataSinkFormat.csv,
                   child: Text('CSV'),
                 ),
-                DropdownMenuItem<int>(
-                  value: DataSinkFormat.mqtt,
-                  child: Text('MQTT'),
-                ),
               ],
               onChanged: (int? value) => context.read<DetailBloc>().add(DetailOnInputChanged(
                     _textEditingControllerMAC.text,
@@ -200,6 +196,9 @@ class _DetailPageState extends State<DetailPage> {
                 border: OutlineInputBorder(),
                 label: Text('WiFi SSID'),
               ),
+              inputFormatters: [
+                ByteSizeLimit(128),
+              ],
             ),
           ),
           Padding(
@@ -226,6 +225,9 @@ class _DetailPageState extends State<DetailPage> {
                   ),
                 ),
               ),
+              inputFormatters: [
+                ByteSizeLimit(128),
+              ],
             ),
           ),
         ],
@@ -267,6 +269,7 @@ class _DetailPageState extends State<DetailPage> {
                 InfoDialogDescriptionRow('Amount of time between each upload cycle'),
                 InfoDialogDescriptionRow('Uploads only happen after a measurement. This means the actual upload time may vary by one measurement cycle.'
                     'For example: MR of 45s and UR of 60s -> the first uploads will happen after 90s, 135s and 180s instead of 60s, 120s and 180s.'),
+                InfoDialogDescriptionRow('Can not be grater than MR * 100. Because we can only store 100 measurements on the esp.'),
                 InfoDialogDescriptionRow('Valid values: 0 - 65535'),
                 InfoDialogDescriptionRow('Default: 600'),
                 Divider(),

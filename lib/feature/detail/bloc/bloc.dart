@@ -178,6 +178,28 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
       event.wifiPassword,
     );
 
+    // Check for disallowed value ranges
+
+    if (event.uploadRate > (event.measurementRate * 100)) {
+      return emit(state.copyWith(
+        snackBarMessage: SnackBarMessage('Upload rate has to be shorter. Current maximum: ${event.measurementRate*100}.'),
+      ));
+    }
+
+    if (event.measurementRate < 0 || event.measurementRate > 65535) {
+      return emit(state.copyWith(
+        snackBarMessage: SnackBarMessage('Measurement rate has to be within 0 - 65535.'),
+      ));
+    }
+
+    if (event.uploadRate < 0 || event.uploadRate > 65535) {
+      return emit(state.copyWith(
+        snackBarMessage: SnackBarMessage('Upload rate has to be within 0 - 65535.'),
+      ));
+    }
+
+    // Start uploading the new configuration
+
     emit(state.copyWith(
       snackBarMessage: SnackBarMessage('Uploading new configuration...'),
     ));
