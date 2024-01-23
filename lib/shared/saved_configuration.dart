@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-class SavedConfiguration extends Equatable{
+class SavedConfiguration extends Equatable {
   final String mac;
 
   final String dataSink;
@@ -9,6 +9,7 @@ class SavedConfiguration extends Equatable{
   final int uploadRate;
   final String wifiSSID;
   final String wifiPassword;
+  final bool subtractMeasuringTime;
 
   const SavedConfiguration(
     this.mac,
@@ -18,10 +19,11 @@ class SavedConfiguration extends Equatable{
     this.uploadRate,
     this.wifiSSID,
     this.wifiPassword,
+    this.subtractMeasuringTime,
   );
 
   @override
-  List<Object?> get props => [mac, dataSink, dataSinkFormat, measurementRate, uploadRate, wifiSSID, wifiPassword];
+  List<Object?> get props => [mac, dataSink, dataSinkFormat, measurementRate, uploadRate, wifiSSID, wifiPassword, subtractMeasuringTime];
 
   factory SavedConfiguration.fromJson(dynamic json) {
     return SavedConfiguration(
@@ -32,6 +34,7 @@ class SavedConfiguration extends Equatable{
       json['uploadRate'],
       json['wifiSSID'],
       json['wifiPassword'],
+      json['subtractMeasuringTime'],
     );
   }
 
@@ -48,6 +51,7 @@ class SavedConfiguration extends Equatable{
       'uploadRate': uploadRate,
       'wifiSSID': wifiSSID,
       'wifiPassword': wifiPassword,
+      'subtractMeasuringTime': subtractMeasuringTime,
     };
   }
 }

@@ -25,6 +25,7 @@ class _DetailPageState extends State<DetailPage> {
   final TextEditingController _textEditingControllerMAC = TextEditingController();
   final TextEditingController _textEditingControllerDataSink = TextEditingController();
   int selectedDataSinkFormat = 0;
+  bool isSubtractMeasuringTimeSelected = false;
   final TextEditingController _textEditingControllerMeasurementRate = TextEditingController();
   final TextEditingController _textEditingControllerUploadRate = TextEditingController();
   final TextEditingController _textEditingControllerWiFiSSID = TextEditingController();
@@ -59,6 +60,7 @@ class _DetailPageState extends State<DetailPage> {
                                 int.parse(_textEditingControllerUploadRate.text),
                                 _textEditingControllerWiFiSSID.text,
                                 _textEditingControllerWiFiPassword.text,
+                                  isSubtractMeasuringTimeSelected
                               ),
                             )
                         : null,
@@ -85,6 +87,7 @@ class _DetailPageState extends State<DetailPage> {
     _textEditingControllerUploadRate.text = state.uploadRate.toString();
     _textEditingControllerWiFiSSID.text = state.wifiSSID;
     _textEditingControllerWiFiPassword.text = state.wifiPassword;
+    isSubtractMeasuringTimeSelected = state.subtractMeasuringTime;
 
     if (state.isInitializing) {
       return const Center(
@@ -163,6 +166,7 @@ class _DetailPageState extends State<DetailPage> {
                     _textEditingControllerWiFiSSID.text,
                     _textEditingControllerWiFiPassword.text,
                     state.wifiPasswordIsVisible,
+                    isSubtractMeasuringTimeSelected,
                   )),
             ),
           ),
@@ -174,6 +178,40 @@ class _DetailPageState extends State<DetailPage> {
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 label: Text('Measurement rate (seconds)'),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+              ),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text('Subtract measuring time'),
+                  ),
+                  SizedBox(
+                    height: 24.0,
+                    child: Checkbox(
+                      value: isSubtractMeasuringTimeSelected,
+                      onChanged: (bool? newValue) {
+                        context.read<DetailBloc>().add(DetailOnInputChanged(
+                          _textEditingControllerMAC.text,
+                          _textEditingControllerDataSink.text,
+                          selectedDataSinkFormat,
+                          int.parse(_textEditingControllerMeasurementRate.text),
+                          int.parse(_textEditingControllerUploadRate.text),
+                          _textEditingControllerWiFiSSID.text,
+                          _textEditingControllerWiFiPassword.text,
+                          !state.wifiPasswordIsVisible,
+                          newValue!,
+                        ));
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -219,6 +257,7 @@ class _DetailPageState extends State<DetailPage> {
                         _textEditingControllerWiFiSSID.text,
                         _textEditingControllerWiFiPassword.text,
                         !state.wifiPasswordIsVisible,
+                        isSubtractMeasuringTimeSelected,
                       )),
                   child: Icon(
                     state.wifiPasswordIsVisible ? Icons.visibility : Icons.visibility_off,
@@ -265,9 +304,14 @@ class _DetailPageState extends State<DetailPage> {
                 InfoDialogDescriptionRow('Valid values: 0 - 65535'),
                 InfoDialogDescriptionRow('Default: 60'),
                 Divider(),
+                InfoDialogTitleRow('Subtract measuring time'),
+                InfoDialogDescriptionRow('Subtract the measuring time from the measurement rate to reduce offsetting. '
+                'Ensures that uploads happen exactly at the specified intervals. A measurement takes roughly 1-2 seconds.'),
+                InfoDialogDescriptionRow('Default: false'),
+                Divider(),
                 InfoDialogTitleRow('Upload Rate (UR)'),
                 InfoDialogDescriptionRow('Amount of time between each upload cycle'),
-                InfoDialogDescriptionRow('Uploads only happen after a measurement. This means the actual upload time may vary by one measurement cycle.'
+                InfoDialogDescriptionRow('Uploads only happen after a measurement. This means the actual upload time may vary by one measurement cycle. '
                     'For example: MR of 45s and UR of 60s -> the first uploads will happen after 90s, 135s and 180s instead of 60s, 120s and 180s.'),
                 InfoDialogDescriptionRow('Can not be grater than MR * 100. Because we can only store 100 measurements on the esp.'),
                 InfoDialogDescriptionRow('Valid values: 0 - 65535'),

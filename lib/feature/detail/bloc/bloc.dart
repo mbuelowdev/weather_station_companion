@@ -31,6 +31,7 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
   static const characteristicUploadRate = 'ff04';
   static const characteristicWifiSSID = 'ff05';
   static const characteristicWifiPassword = 'ff06';
+  static const characteristicSubtractMeasuringTime = 'ff07';
   static const characteristicFlushTrigger = 'ffff';
 
   DetailBloc(this.mac, this.shouldConnect) : super(const DetailState()) {
@@ -56,6 +57,7 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
       uploadRate: event.loadedConfiguration?.uploadRate ?? -1,
       wifiSSID: event.loadedConfiguration?.wifiSSID ?? '',
       wifiPassword: event.loadedConfiguration?.wifiPassword ?? '',
+      subtractMeasuringTime: event.loadedConfiguration?.subtractMeasuringTime ?? false,
     ));
 
     if (event.shouldConnect) {
@@ -176,6 +178,7 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
       event.uploadRate,
       event.wifiSSID,
       event.wifiPassword,
+      event.subtractMeasuringTime,
     );
 
     // Check for disallowed value ranges
@@ -211,6 +214,7 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
       possiblyNewConfiguration.uploadRate,
       possiblyNewConfiguration.wifiSSID,
       possiblyNewConfiguration.wifiPassword,
+      possiblyNewConfiguration.subtractMeasuringTime,
     );
 
     // Only save the configuration if the write operation was successful
@@ -258,6 +262,7 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
       uploadRate: event.uploadRate,
       wifiSSID: event.wifiSSID,
       wifiPassword: event.wifiPassword,
+      subtractMeasuringTime: event.subtractMeasuringTime,
       wifiPasswordIsVisible: event.wifiPasswordIsVisible,
     ));
   }
@@ -275,6 +280,7 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
       int? uploadRate = null;
       String? wifiSSID = null;
       String? wifiPassword = null;
+      bool? subtractMeasuringTime = null;
 
       // Start looking for services advertised by the device
       await targetDevice!.discoverServices();
@@ -305,6 +311,10 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
           case characteristicWifiPassword:
             wifiPassword = utf8.decode((await characteristic.read()));
             break;
+          case characteristicSubtractMeasuringTime:
+            final bytes = await characteristic.read();
+            subtractMeasuringTime = bytes[0] > 0;
+            break;
         }
       }
 
@@ -316,13 +326,14 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
         uploadRate!,
         wifiSSID!,
         wifiPassword!,
+        subtractMeasuringTime!,
       );
     } catch (_) {}
 
     return null;
   }
 
-  Future<bool> _writeConfiguration(String dataSink, int dataSinkFormat, int measurementRate, int uploadRate, String wifiSSID, String wifiPassword) async {
+  Future<bool> _writeConfiguration(String dataSink, int dataSinkFormat, int measurementRate, int uploadRate, String wifiSSID, String wifiPassword, bool subtractMeasuringTime) async {
     // If we fail to connect to the device then targetDevice will be null
     if (targetDevice == null) {
       return false;
@@ -354,6 +365,9 @@ class DetailBloc extends Bloc<DetailEvent, DetailState> {
             break;
           case characteristicWifiPassword:
             await characteristic.write(utf8.encode(wifiPassword + '\x00'));
+            break;
+          case characteristicSubtractMeasuringTime:
+            await characteristic.write([subtractMeasuringTime ? 1 : 0]);
             break;
         }
       }

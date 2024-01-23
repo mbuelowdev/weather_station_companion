@@ -19,6 +19,7 @@ class DetailSaveButtonPressed extends DetailEvent {
   final int uploadRate;
   final String wifiSSID;
   final String wifiPassword;
+  final bool subtractMeasuringTime;
 
   DetailSaveButtonPressed(
     this.mac,
@@ -28,6 +29,7 @@ class DetailSaveButtonPressed extends DetailEvent {
     this.uploadRate,
     this.wifiSSID,
     this.wifiPassword,
+    this.subtractMeasuringTime,
   );
 }
 
@@ -39,6 +41,7 @@ class DetailOnInputChanged extends DetailEvent {
   final int uploadRate;
   final String wifiSSID;
   final String wifiPassword;
+  final bool subtractMeasuringTime;
   final bool wifiPasswordIsVisible;
 
   DetailOnInputChanged(
@@ -49,6 +52,7 @@ class DetailOnInputChanged extends DetailEvent {
       this.uploadRate,
       this.wifiSSID,
       this.wifiPassword,
+      this.subtractMeasuringTime,
       this.wifiPasswordIsVisible,
       );
 }
